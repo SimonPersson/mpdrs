@@ -304,6 +304,11 @@ impl<S: Read + Write> Client<S> {
     pub fn login(&mut self, password: &str) -> Result<()> {
         self.run_command("password", password).and_then(|_| self.expect_ok())
     }
+
+    /// Set the maximum binary response size for the current connection to the specified number of bytes.
+    pub fn binarylimit(&mut self, size: usize) -> Result<()> {
+        self.run_command("binarylimit", size).and_then(|_| self.expect_ok())
+    }
     // }}}
 
     // Playlist methods {{{
