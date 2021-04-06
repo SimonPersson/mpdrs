@@ -4,24 +4,15 @@ use crate::convert::FromIter;
 use crate::error::{Error, ParseError};
 
 use std::fmt;
+use std::ops::{Bound, RangeBounds};
 use std::str::FromStr;
 use std::time::Duration;
-
-/// Song ID
-#[derive(Debug, Copy, Clone, PartialEq, PartialOrd, Eq, Ord, Default)]
-pub struct Id(pub u32);
-
-impl fmt::Display for Id {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.0.fmt(f)
-    }
-}
 
 /// Song place in the queue
 #[derive(Debug, Copy, Clone, PartialEq, Default)]
 pub struct QueuePlace {
     /// song ID
-    pub id: Id,
+    pub id: u32,
     /// absolute zero-based song position
     pub pos: u32,
     /// song priority, if present, defaults to 0
@@ -30,20 +21,39 @@ pub struct QueuePlace {
 
 /// Song range
 #[derive(Debug, Copy, Clone, PartialEq)]
-pub struct Range(pub Duration, pub Option<Duration>);
+pub struct Range(pub Option<u32>, pub Option<u32>);
+
+impl<T: RangeBounds<u32>> From<T> for Range {
+    fn from(v: T) -> Self {
+        Range(
+            match v.start_bound() {
+                Bound::Included(v) => Some(*v),
+                Bound::Excluded(v) => Some(v + 1),
+                Bound::Unbounded => None,
+            },
+            match v.end_bound() {
+                Bound::Included(v) => Some(v + 1),
+                Bound::Excluded(v) => Some(*v),
+                Bound::Unbounded => None,
+            },
+        )
+    }
+}
 
 impl Default for Range {
     fn default() -> Range {
-        Range(Duration::from_secs(0), None)
+        Range(None, None)
     }
 }
 
 impl fmt::Display for Range {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.0.as_secs().fmt(f)?;
+        if let Some(v) = self.0 {
+            v.fmt(f)?;
+        }
         f.write_str(":")?;
         if let Some(v) = self.1 {
-            v.as_secs().fmt(f)?;
+            v.fmt(f)?;
         }
         Ok(())
     }
@@ -54,10 +64,10 @@ impl FromStr for Range {
     fn from_str(s: &str) -> Result<Range, ParseError> {
         let mut splits = s.split('-').flat_map(|v| v.parse().into_iter());
         match (splits.next(), splits.next()) {
-            (Some(s), Some(e)) => Ok(Range(Duration::from_secs(s), Some(Duration::from_secs(e)))),
-            (None, Some(e)) => Ok(Range(Duration::from_secs(0), Some(Duration::from_secs(e)))),
-            (Some(s), None) => Ok(Range(Duration::from_secs(s), None)),
-            (None, None) => Ok(Range(Duration::from_secs(0), None)),
+            (Some(s), Some(e)) => Ok(Range(Some(s), Some(e))),
+            (None, Some(e)) => Ok(Range(None, Some(e))),
+            (Some(s), None) => Ok(Range(Some(s), None)),
+            (None, None) => Ok(Range(None, None)),
         }
     }
 }
@@ -103,18 +113,18 @@ impl FromIter for Song {
                 "Id" => match result.place {
                     None => {
                         result.place = Some(QueuePlace {
-                            id: Id(line.1.parse()?),
+                            id: line.1.parse()?,
                             pos: 0,
                             prio: 0,
                         })
                     }
-                    Some(ref mut place) => place.id = Id(line.1.parse()?),
+                    Some(ref mut place) => place.id = line.1.parse()?,
                 },
                 "Pos" => match result.place {
                     None => {
                         result.place = Some(QueuePlace {
                             pos: line.1.parse()?,
-                            id: Id(0),
+                            id: 0,
                             prio: 0,
                         })
                     }
@@ -124,7 +134,7 @@ impl FromIter for Song {
                     None => {
                         result.place = Some(QueuePlace {
                             prio: line.1.parse()?,
-                            id: Id(0),
+                            id: 0,
                             pos: 0,
                         })
                     }

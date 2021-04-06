@@ -6,8 +6,7 @@
 
 use bufstream::BufStream;
 
-use crate::convert::*;
-use crate::error::{Error, ParseError, ProtoError, Result};
+use crate::error::{Error, ProtoError, Result};
 use crate::lsinfo::LsInfoResponse;
 use crate::message::{Channel, Message};
 use crate::mount::{Mount, Neighbor};
@@ -16,7 +15,7 @@ use crate::playlist::Playlist;
 use crate::plugin::Plugin;
 use crate::proto::*;
 use crate::search::{Query, Term, Window};
-use crate::song::{Id, Song};
+use crate::song::{Range, Song};
 use crate::stats::Stats;
 use crate::status::{ReplayGain, Status};
 use crate::sticker::Sticker;
@@ -118,8 +117,8 @@ impl<S: Read + Write> Client<S> {
     }
 
     /// Set crossfade time in seconds
-    pub fn crossfade<T: ToSeconds>(&mut self, value: T) -> Result<()> {
-        self.run_command("crossfade", value.to_seconds()).and_then(|_| self.expect_ok())
+    pub fn crossfade(&mut self, value: u32) -> Result<()> {
+        self.run_command("crossfade", value).and_then(|_| self.expect_ok())
     }
 
     /// Set mixramp level in dB
@@ -128,8 +127,8 @@ impl<S: Read + Write> Client<S> {
     }
 
     /// Set mixramp delay in seconds
-    pub fn mixrampdelay<T: ToSeconds>(&mut self, value: T) -> Result<()> {
-        self.run_command("mixrampdelay", value.to_seconds()).and_then(|_| self.expect_ok())
+    pub fn mixrampdelay(&mut self, value: u32) -> Result<()> {
+        self.run_command("mixrampdelay", value).and_then(|_| self.expect_ok())
     }
 
     /// Set replay gain mode
@@ -144,10 +143,14 @@ impl<S: Read + Write> Client<S> {
         self.run_command("play", ()).and_then(|_| self.expect_ok())
     }
 
-    /// Start playback from given song in a queue
-    pub fn switch<T: ToQueuePlace>(&mut self, place: T) -> Result<()> {
-        let command = if T::is_id() { "playid" } else { "play" };
-        self.run_command(command, place.to_place()).and_then(|_| self.expect_ok())
+    /// Start playback from given position in a queue
+    pub fn play_from_position(&mut self, place: u32) -> Result<()> {
+        self.run_command("play", place).and_then(|_| self.expect_ok())
+    }
+
+    /// Start playback from given id in a queue
+    pub fn play_from_id(&mut self, place: u32) -> Result<()> {
+        self.run_command("playid", place).and_then(|_| self.expect_ok())
     }
 
     /// Switch to a next song in queue
@@ -176,24 +179,31 @@ impl<S: Read + Write> Client<S> {
         self.run_command("pause", value as u8).and_then(|_| self.expect_ok())
     }
 
-    /// Seek to a given place (in seconds) in a given song
-    pub fn seek<T: ToSeconds, P: ToQueuePlace>(&mut self, place: P, pos: T) -> Result<()> {
-        let command = if P::is_id() { "seekid" } else { "seek" };
-        self.run_command(command, (place.to_place(), pos.to_seconds()))
-            .and_then(|_| self.expect_ok())
+    /// Seek to a given place (in seconds) in a song identified by position
+    pub fn seek(&mut self, place: u32, pos: u32) -> Result<()> {
+        self.run_command("seek", (place, pos)).and_then(|_| self.expect_ok())
+    }
+
+    /// Seek to a given place (in seconds) in a song identified by id
+    pub fn seek_id(&mut self, place: u32, pos: u32) -> Result<()> {
+        self.run_command("seekid", (place, pos)).and_then(|_| self.expect_ok())
     }
 
     /// Seek to a given place (in seconds) in the current song
-    pub fn rewind<T: ToSeconds>(&mut self, pos: T) -> Result<()> {
-        self.run_command("seekcur", pos.to_seconds()).and_then(|_| self.expect_ok())
+    pub fn rewind(&mut self, pos: u32) -> Result<()> {
+        self.run_command("seekcur", pos).and_then(|_| self.expect_ok())
     }
     // }}}
 
     // Queue control {{{
     /// List given song or range of songs in a play queue
-    pub fn songs<T: ToQueueRangeOrPlace>(&mut self, pos: T) -> Result<Vec<Song>> {
-        let command = if T::is_id() { "playlistid" } else { "playlistinfo" };
-        self.run_command(command, pos.to_range()).and_then(|_| self.read_structs("file"))
+    pub fn playlistinfo<T: Into<Range>>(&mut self, pos: T) -> Result<Vec<Song>> {
+        self.run_command("playlistinfo", pos.into()).and_then(|_| self.read_structs("file"))
+    }
+
+    /// List given song in a play queue
+    pub fn playlistid(&mut self, pos: u32) -> Result<Song> {
+        self.run_command("playlistid", pos).and_then(|_| self.read_struct())
     }
 
     /// List all songs in a play queue
@@ -219,68 +229,80 @@ impl<S: Read + Write> Client<S> {
     }
 
     /// Append all songs in path (directories add recursively) to the playlist
-    pub fn add<P: ToSongPath>(&mut self, path: P) -> Result<()> {
+    pub fn add(&mut self, path: &str) -> Result<()> {
         self.run_command("add", path).and_then(|_| self.expect_ok())
     }
 
     /// Append a song into a queue
-    pub fn push<P: ToSongPath>(&mut self, path: P) -> Result<Id> {
-        self.run_command("addid", path).and_then(|_| self.read_field("Id")).map(Id)
+    pub fn push(&mut self, path: &str) -> Result<u32> {
+        self.run_command("addid", path).and_then(|_| self.read_field("Id"))
     }
 
     /// Insert a song into a given position in a queue
-    pub fn insert<P: ToSongPath>(&mut self, path: P, pos: usize) -> Result<usize> {
+    pub fn insert(&mut self, path: &str, pos: usize) -> Result<usize> {
         self.run_command("addid", (path, pos)).and_then(|_| self.read_field("Id"))
     }
 
-    /// Delete a song (at some position) or several songs (in a range) from a queue
-    pub fn delete<T: ToQueueRangeOrPlace>(&mut self, pos: T) -> Result<()> {
-        let command = if T::is_id() { "deleteid" } else { "delete" };
-        self.run_command(command, pos.to_range()).and_then(|_| self.expect_ok())
+    /// Delete several songs (in a range) from a queue
+    pub fn delete<T: Into<Range>>(&mut self, pos: T) -> Result<()> {
+        self.run_command("delete", pos.into()).and_then(|_| self.expect_ok())
+    }
+
+    /// Delete a song from a queue
+    pub fn deleteid(&mut self, pos: u32) -> Result<()> {
+        self.run_command("deleteid", pos).and_then(|_| self.expect_ok())
     }
 
     /// Move a song (at a some position) or several songs (in a range) to other position in queue
-    pub fn shift<T: ToQueueRangeOrPlace>(&mut self, from: T, to: usize) -> Result<()> {
-        let command = if T::is_id() { "moveid" } else { "move" };
-        self.run_command(command, (from.to_range(), to)).and_then(|_| self.expect_ok())
+    pub fn move_range<T: Into<Range>>(&mut self, from: T, to: usize) -> Result<()> {
+        self.run_command("move", (from.into(), to)).and_then(|_| self.expect_ok())
     }
 
-    /// Swap to songs in a queue
-    pub fn swap<T: ToQueuePlace>(&mut self, one: T, two: T) -> Result<()> {
-        let command = if T::is_id() { "swapid" } else { "swap" };
-        self.run_command(command, (one.to_place(), two.to_place()))
-            .and_then(|_| self.expect_ok())
+    /// Move a song (at a some position) or several songs (in a range) to other position in queue
+    pub fn moveid(&mut self, from: u32, to: usize) -> Result<()> {
+        self.run_command("moveid", (from, to)).and_then(|_| self.expect_ok())
+    }
+
+    /// Swap two songs identified by queue position in a queue
+    pub fn swap(&mut self, one: u32, two: u32) -> Result<()> {
+        self.run_command("swap", (one, two)).and_then(|_| self.expect_ok())
+    }
+
+    /// Swap two songs identified by id in a queue
+    pub fn swapid(&mut self, one: u32, two: u32) -> Result<()> {
+        self.run_command("swapid", (one, two)).and_then(|_| self.expect_ok())
     }
 
     /// Shuffle queue in a given range (use `..` to shuffle full queue)
-    pub fn shuffle<T: ToQueueRange>(&mut self, range: T) -> Result<()> {
-        self.run_command("shuffle", range.to_range()).and_then(|_| self.expect_ok())
+    pub fn shuffle<T: Into<Range>>(&mut self, range: T) -> Result<()> {
+        self.run_command("shuffle", range.into()).and_then(|_| self.expect_ok())
     }
 
     /// Set song priority in a queue
-    pub fn priority<T: ToQueueRangeOrPlace>(&mut self, pos: T, prio: u8) -> Result<()> {
-        let command = if T::is_id() { "prioid" } else { "prio" };
-        self.run_command(command, (prio, pos.to_range())).and_then(|_| self.expect_ok())
+    pub fn prio<T: Into<Range>>(&mut self, pos: T, prio: u8) -> Result<()> {
+        self.run_command("prio", (prio, pos.into())).and_then(|_| self.expect_ok())
+    }
+
+    /// Set song priority in a queue
+    pub fn prioid(&mut self, pos: u32, prio: u8) -> Result<()> {
+        self.run_command("prioid", (prio, pos)).and_then(|_| self.expect_ok())
     }
 
     /// Set song range (in seconds) to play
     ///
     /// Doesn't work for currently playing song.
-    pub fn range<T: ToSongId, R: ToSongRange>(&mut self, song: T, range: R) -> Result<()> {
-        self.run_command("rangeid", (song.to_song_id(), range.to_range()))
-            .and_then(|_| self.expect_ok())
+    pub fn range<T: Into<Range>>(&mut self, song: u32, range: T) -> Result<()> {
+        self.run_command("rangeid", (song, range.into())).and_then(|_| self.expect_ok())
     }
 
     /// Add tag to a song
-    pub fn tag<T: ToSongId>(&mut self, song: T, tag: &str, value: &str) -> Result<()> {
-        self.run_command("addtagid", (song.to_song_id(), tag, value))
-            .and_then(|_| self.expect_ok())
+    pub fn tag(&mut self, song: u32, tag: &str, value: &str) -> Result<()> {
+        self.run_command("addtagid", (song, tag, value)).and_then(|_| self.expect_ok())
     }
 
     /// Delete tag from a song
-    pub fn untag<T: ToSongId>(&mut self, song: T, tag: &str) -> Result<()> {
-        self.run_command("cleartagid", (song.to_song_id(), tag))
-            .and_then(|_| self.expect_ok())
+    pub fn untag(&mut self, song: u32, tag: &str) -> Result<()> {
+        self.run_command("cleartagid", (song, tag)).and_then(|_| self.expect_ok())
     }
     // }}}
 
@@ -318,58 +340,53 @@ impl<S: Read + Write> Client<S> {
     }
 
     /// List all songs in a playlist
-    pub fn playlist<N: ToPlaylistName>(&mut self, name: N) -> Result<Vec<Song>> {
-        self.run_command("listplaylistinfo", name.to_name())
-            .and_then(|_| self.read_structs("file"))
+    pub fn playlist(&mut self, name: &str) -> Result<Vec<Song>> {
+        self.run_command("listplaylistinfo", name).and_then(|_| self.read_structs("file"))
     }
 
     /// Load playlist into queue
     ///
     /// You can give either full range (`..`) to load all songs in a playlist,
     /// or some partial range to load only part of playlist.
-    pub fn load<T: ToQueueRange, N: ToPlaylistName>(&mut self, name: N, range: T) -> Result<()> {
-        self.run_command("load", (name.to_name(), range.to_range()))
-            .and_then(|_| self.expect_ok())
+    pub fn load<T: Into<Range>>(&mut self, name: &str, range: T) -> Result<()> {
+        self.run_command("load", (name, range.into())).and_then(|_| self.expect_ok())
     }
 
     /// Save current queue into playlist
     ///
     /// If playlist with given name doesn't exist, create new one.
-    pub fn save<N: ToPlaylistName>(&mut self, name: N) -> Result<()> {
-        self.run_command("save", name.to_name()).and_then(|_| self.expect_ok())
+    pub fn save(&mut self, name: &str) -> Result<()> {
+        self.run_command("save", name).and_then(|_| self.expect_ok())
     }
 
     /// Rename playlist
-    pub fn pl_rename<N: ToPlaylistName>(&mut self, name: N, newname: &str) -> Result<()> {
-        self.run_command("rename", (name.to_name(), newname)).and_then(|_| self.expect_ok())
+    pub fn pl_rename(&mut self, name: &str, newname: &str) -> Result<()> {
+        self.run_command("rename", (name, newname)).and_then(|_| self.expect_ok())
     }
 
     /// Clear playlist
-    pub fn pl_clear<N: ToPlaylistName>(&mut self, name: N) -> Result<()> {
-        self.run_command("playlistclear", name.to_name()).and_then(|_| self.expect_ok())
+    pub fn pl_clear(&mut self, name: &str) -> Result<()> {
+        self.run_command("playlistclear", name).and_then(|_| self.expect_ok())
     }
 
     /// Delete playlist
-    pub fn pl_remove<N: ToPlaylistName>(&mut self, name: N) -> Result<()> {
-        self.run_command("rm", name.to_name()).and_then(|_| self.expect_ok())
+    pub fn pl_remove(&mut self, name: &str) -> Result<()> {
+        self.run_command("rm", name).and_then(|_| self.expect_ok())
     }
 
     /// Add new songs to a playlist
-    pub fn pl_push<N: ToPlaylistName, P: ToSongPath>(&mut self, name: N, path: P) -> Result<()> {
-        self.run_command("playlistadd", (name.to_name(), path))
-            .and_then(|_| self.expect_ok())
+    pub fn pl_push(&mut self, name: &str, path: &str) -> Result<()> {
+        self.run_command("playlistadd", (name, path)).and_then(|_| self.expect_ok())
     }
 
     /// Delete a song at a given position in a playlist
-    pub fn pl_delete<N: ToPlaylistName>(&mut self, name: N, pos: u32) -> Result<()> {
-        self.run_command("playlistdelete", (name.to_name(), pos))
-            .and_then(|_| self.expect_ok())
+    pub fn pl_delete(&mut self, name: &str, pos: u32) -> Result<()> {
+        self.run_command("playlistdelete", (name, pos)).and_then(|_| self.expect_ok())
     }
 
     /// Move song in a playlist from one position into another
-    pub fn pl_shift<N: ToPlaylistName>(&mut self, name: N, from: u32, to: u32) -> Result<()> {
-        self.run_command("playlistmove", (name.to_name(), from, to))
-            .and_then(|_| self.expect_ok())
+    pub fn pl_shift(&mut self, name: &str, from: u32, to: u32) -> Result<()> {
+        self.run_command("playlistmove", (name, from, to)).and_then(|_| self.expect_ok())
     }
     // }}}
 
@@ -407,7 +424,7 @@ impl<S: Read + Write> Client<S> {
     }
 
     /// Find album art for file
-    pub fn albumart<P: ToSongPath>(&mut self, path: &P) -> Result<Vec<u8>> {
+    pub fn albumart(&mut self, path: &str) -> Result<Vec<u8>> {
         let mut buf = vec![];
         loop {
             self.run_command("albumart", (path, &*format!("{}", buf.len())))?;
@@ -455,13 +472,13 @@ impl<S: Read + Write> Client<S> {
     }
 
     /// Lists the contents of a directory.
-    pub fn lsinfo<P: ToSongPath>(&mut self, path: P) -> Result<Vec<LsInfoResponse>> {
+    pub fn lsinfo(&mut self, path: &str) -> Result<Vec<LsInfoResponse>> {
         self.run_command("lsinfo", path)?;
         Ok(self.read_structs(&["directory", "file", "playlist"][..])?)
     }
 
     /// Returns raw metadata for file
-    pub fn readcomments<'a, P: ToSongPath>(&'a mut self, path: P) -> Result<impl Iterator<Item = Result<(String, String)>> + 'a> {
+    pub fn readcomments<'a>(&'a mut self, path: &str) -> Result<impl Iterator<Item = Result<(String, String)>> + 'a> {
         self.run_command("readcomments", path)?;
         Ok(self.read_pairs())
     }
@@ -475,7 +492,7 @@ impl<S: Read + Write> Client<S> {
     }
 
     /// Set given output enabled state
-    pub fn output<T: ToOutputId>(&mut self, id: T, state: bool) -> Result<()> {
+    pub fn output(&mut self, id: u32, state: bool) -> Result<()> {
         if state {
             self.out_enable(id)
         } else {
@@ -484,18 +501,18 @@ impl<S: Read + Write> Client<S> {
     }
 
     /// Disable given output
-    pub fn out_disable<T: ToOutputId>(&mut self, id: T) -> Result<()> {
-        self.run_command("disableoutput", id.to_output_id()).and_then(|_| self.expect_ok())
+    pub fn out_disable(&mut self, id: u32) -> Result<()> {
+        self.run_command("disableoutput", id).and_then(|_| self.expect_ok())
     }
 
     /// Enable given output
-    pub fn out_enable<T: ToOutputId>(&mut self, id: T) -> Result<()> {
-        self.run_command("enableoutput", id.to_output_id()).and_then(|_| self.expect_ok())
+    pub fn out_enable(&mut self, id: u32) -> Result<()> {
+        self.run_command("enableoutput", id).and_then(|_| self.expect_ok())
     }
 
     /// Toggle given output
-    pub fn out_toggle<T: ToOutputId>(&mut self, id: T) -> Result<()> {
-        self.run_command("toggleoutput", id.to_output_id()).and_then(|_| self.expect_ok())
+    pub fn out_toggle(&mut self, id: u32) -> Result<()> {
+        self.run_command("toggleoutput", id).and_then(|_| self.expect_ok())
     }
     // }}}
 

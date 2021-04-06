@@ -61,7 +61,7 @@ pub use output::Output;
 pub use playlist::Playlist;
 pub use plugin::Plugin;
 pub use search::{FilterQuery, Query, Term};
-pub use song::{Id, Song};
+pub use song::Song;
 pub use stats::Stats;
 pub use status::{ReplayGain, State, Status};
 pub use version::Version;

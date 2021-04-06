@@ -2,7 +2,7 @@
 
 use crate::convert::FromIter;
 use crate::error::{Error, ParseError};
-use crate::song::{Id, QueuePlace};
+use crate::song::QueuePlace;
 
 use std::fmt;
 use std::str::FromStr;
@@ -75,18 +75,18 @@ impl FromIter for Status {
                 "songid" => match result.song {
                     None => {
                         result.song = Some(QueuePlace {
-                            id: Id(line.1.parse()?),
+                            id: line.1.parse()?,
                             pos: 0,
                             prio: 0,
                         })
                     }
-                    Some(ref mut place) => place.id = Id(line.1.parse()?),
+                    Some(ref mut place) => place.id = line.1.parse()?,
                 },
                 "song" => match result.song {
                     None => {
                         result.song = Some(QueuePlace {
                             pos: line.1.parse()?,
-                            id: Id(0),
+                            id: 0,
                             prio: 0,
                         })
                     }
@@ -95,18 +95,18 @@ impl FromIter for Status {
                 "nextsongid" => match result.nextsong {
                     None => {
                         result.nextsong = Some(QueuePlace {
-                            id: Id(line.1.parse()?),
+                            id: line.1.parse()?,
                             pos: 0,
                             prio: 0,
                         })
                     }
-                    Some(ref mut place) => place.id = Id(line.1.parse()?),
+                    Some(ref mut place) => place.id = line.1.parse()?,
                 },
                 "nextsong" => match result.nextsong {
                     None => {
                         result.nextsong = Some(QueuePlace {
                             pos: line.1.parse()?,
-                            id: Id(0),
+                            id: 0,
                             prio: 0,
                         })
                     }
