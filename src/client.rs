@@ -699,14 +699,6 @@ impl<S: Read + Write> Proto for Client<S> {
         Pairs((&mut self.socket).lines())
     }
 
-    fn read_pair(&mut self) -> Result<(String, String)> {
-        let line = self.read_line()?;
-        let mut split = line.split(": ");
-        let key = split.next().ok_or(ParseError::BadPair)?;
-        let val = split.next().ok_or(ParseError::BadPair)?;
-        Ok((key.to_string(), val.to_string()))
-    }
-
     fn run_command<I>(&mut self, command: &str, arguments: I) -> Result<()>
     where
         I: ToArguments,
