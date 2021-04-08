@@ -2,8 +2,6 @@
 // TODO: unfinished functionality
 
 use crate::proto::ToArguments;
-use std::borrow::Cow;
-use std::convert::Into;
 use std::fmt;
 use std::result::Result as StdResult;
 
@@ -12,20 +10,17 @@ pub enum Term<'a> {
     File,
     Base,
     LastMod,
-    Tag(Cow<'a, str>),
+    Tag(&'a str),
 }
 
 pub struct Filter<'a> {
     typ: Term<'a>,
-    what: Cow<'a, str>,
+    what: &'a str,
 }
 
 impl<'a> Filter<'a> {
-    fn new<W>(typ: Term<'a>, what: W) -> Filter
-    where
-        W: 'a + Into<Cow<'a, str>>,
-    {
-        Filter { typ, what: what.into() }
+    fn new(typ: Term<'a>, what: &'a str) -> Filter<'a> {
+        Filter { typ, what }
     }
 }
 
@@ -58,7 +53,7 @@ impl<'a> FilterQuery<'a> {
         FilterQuery { filters: Vec::new() }
     }
 
-    pub fn and<'b: 'a, V: 'b + Into<Cow<'b, str>>>(&mut self, term: Term<'b>, value: V) -> &mut FilterQuery<'a> {
+    pub fn and<'b: 'a>(&mut self, term: Term<'b>, value: &'b str) -> &mut FilterQuery<'a> {
         self.filters.push(Filter::new(term, value));
         self
     }
@@ -71,7 +66,7 @@ impl<'a> fmt::Display for Term<'a> {
             Term::File => "file",
             Term::Base => "base",
             Term::LastMod => "modified-since",
-            Term::Tag(ref tag) => &*tag,
+            Term::Tag(tag) => tag,
         })
     }
 }
