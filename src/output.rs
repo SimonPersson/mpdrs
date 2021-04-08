@@ -3,7 +3,6 @@
 use crate::convert::FromMap;
 use crate::error::{Error, ProtoError};
 use std::collections::BTreeMap;
-use std::convert::From;
 
 /// Sound output
 #[derive(Clone, Debug, PartialEq)]
@@ -19,12 +18,16 @@ pub struct Output {
 impl FromMap for Output {
     fn from_map(map: BTreeMap<String, String>) -> Result<Output, Error> {
         Ok(Output {
-            id: get_field!(map, "outputid"),
+            id: map.get("outputid").ok_or(Error::Proto(ProtoError::NoField("outputid")))?.parse()?,
             name: map
                 .get("outputname")
                 .map(|v| v.to_owned())
                 .ok_or(Error::Proto(ProtoError::NoField("outputname")))?,
-            enabled: get_field!(map, bool "outputenabled"),
+            enabled: map
+                .get("outputenabled")
+                .ok_or(Error::Proto(ProtoError::NoField("outputenabled")))?
+                .parse::<i32>()?
+                == 1,
         })
     }
 }
