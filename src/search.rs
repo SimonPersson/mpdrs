@@ -162,6 +162,7 @@ mod test {
         let mut query = FilterQuery::new();
         query.and(Term::Tag("albumartist".into()), "Mac DeMarco");
         query.and(Term::Tag("album".into()), "Salad Days");
+        let output = collect(&query);
         assert_eq!(output, vec!["albumartist", "Mac DeMarco", "album", "Salad Days"]);
     }
 }

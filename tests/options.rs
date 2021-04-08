@@ -48,17 +48,6 @@ test_option!(repeat, true, false);
 // test_option!(mixrampdelay, 1 => Some(Duration::from_secs(1)), 0 => None);
 
 #[test]
-fn volume() {
-    let mut mpd = connect();
-    if mpd.status().unwrap().volume >= 0 {
-        mpd.volume(100).unwrap();
-        assert_eq!(mpd.status().unwrap().volume, 100);
-        mpd.volume(0).unwrap();
-        assert_eq!(mpd.status().unwrap().volume, 0);
-    }
-}
-
-#[test]
 fn crossfade() {
     let mut mpd = connect();
     mpd.crossfade(1000).unwrap();

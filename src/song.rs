@@ -48,9 +48,7 @@ impl Default for Range {
 
 impl fmt::Display for Range {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        if let Some(v) = self.0 {
-            v.fmt(f)?;
-        }
+        self.0.unwrap_or(0).fmt(f)?;
         f.write_str(":")?;
         if let Some(v) = self.1 {
             v.fmt(f)?;

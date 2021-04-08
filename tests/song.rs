@@ -16,7 +16,7 @@ fn queue() {
     let queue = mpd.queue().unwrap();
     println!("{:?}", queue);
 
-    let songs = mpd.songs(..).unwrap();
+    let songs = mpd.playlistinfo(..).unwrap();
     assert_eq!(songs, queue);
 }
 

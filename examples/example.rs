@@ -8,7 +8,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let now_playing = c.currentsong()?;
     if let Some(song) = now_playing {
         println!("Metadata:");
-        for row in c.readcomments(song)? {
+        for row in c.readcomments(&*song.file)? {
             if let Ok((k, v)) = row {
                 println!("{}: {}", k, v);
             }
