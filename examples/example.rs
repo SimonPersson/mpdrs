@@ -1,6 +1,6 @@
-extern crate mpd;
+extern crate mpdrs;
 
-use mpd::{Client, Query};
+use mpdrs::{Client, Query};
 use std::net::TcpStream;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

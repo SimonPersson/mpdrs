@@ -1,9 +1,9 @@
-extern crate mpd;
+extern crate mpdrs;
 
 mod helpers;
 use helpers::Daemon;
 
-use mpd::Idle;
+use mpdrs::Idle;
 
 #[test]
 fn idle() {
@@ -16,5 +16,5 @@ fn idle() {
     mpd1.consume(false).unwrap();
 
     let sys = idle.get().unwrap();
-    assert_eq!(&*sys, &[mpd::Subsystem::Options]);
+    assert_eq!(&*sys, &[mpdrs::Subsystem::Options]);
 }

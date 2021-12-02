@@ -18,9 +18,9 @@
 //! ```
 //!
 //! ```rust,no_run
-//! extern crate mpd;
+//! extern crate mpdrs;
 //!
-//! use mpd::Client;
+//! use mpdrs::Client;
 //! use std::net::TcpStream;
 //!
 //! # fn main() {

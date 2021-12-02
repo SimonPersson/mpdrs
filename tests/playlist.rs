@@ -1,4 +1,4 @@
-extern crate mpd;
+extern crate mpdrs;
 
 mod helpers;
 use helpers::connect;

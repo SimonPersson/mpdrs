@@ -1,4 +1,4 @@
-extern crate mpd;
+extern crate mpdrs;
 
 mod helpers;
 use helpers::connect;
@@ -55,7 +55,7 @@ fn crossfade() {
     mpd.crossfade(0).unwrap();
     assert_eq!(
         mpd.status().unwrap().crossfade,
-        if mpd.version >= mpd::Version(0, 19, 0) {
+        if mpd.version >= mpdrs::Version(0, 19, 0) {
             None
         } else {
             Some(Duration::from_secs(0))

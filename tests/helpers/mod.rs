@@ -1,4 +1,4 @@
-extern crate mpd;
+extern crate mpdrs;
 
 mod daemon;
 
@@ -7,13 +7,13 @@ use std::os::unix::net::UnixStream;
 
 pub struct DaemonClient {
     _daemon: Daemon,
-    client: mpd::Client<UnixStream>,
+    client: mpdrs::Client<UnixStream>,
 }
 
 use std::ops::{Deref, DerefMut};
 
 impl Deref for DaemonClient {
-    type Target = mpd::Client<UnixStream>;
+    type Target = mpdrs::Client<UnixStream>;
     fn deref(&self) -> &Self::Target {
         &self.client
     }

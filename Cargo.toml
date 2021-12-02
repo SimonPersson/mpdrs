@@ -1,13 +1,12 @@
 [package]
-authors = ["Konstantin Stepanov <me@kstep.me>"]
-description = "A client library for MPD (music player daemon), like libmpdclient but in Rust"
-documentation = "http://kstep.me/rust-mpd/mpd/index.html"
-homepage = "https://github.com/kstep/rust-mpd"
+authors = ["Simon Persson <simon@flaskpost.me>"]
+description = "A minimal, synchronous MPD library."
+homepage = "https://github.com/SimonPersson/mpdrs"
 license = "MIT/Apache-2.0"
-name = "mpd"
-repository = "https://github.com/kstep/rust-mpd.git"
+name = "mpdrs"
+repository = "https://github.com/SimonPersson/mpdrs"
 version = "0.1.0"
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 bufstream = { version = "0.1", default-features = false }

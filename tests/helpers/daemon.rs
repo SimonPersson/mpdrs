@@ -1,7 +1,7 @@
 extern crate tempdir;
 
 use self::tempdir::TempDir;
-use super::mpd;
+use super::mpdrs;
 use std::fs::{create_dir, File};
 use std::io::{Read, Write};
 use std::os::unix::net::UnixStream;
@@ -134,12 +134,12 @@ impl Daemon {
         daemon
     }
 
-    fn maybe_connect(&self) -> Result<mpd::Client<UnixStream>, mpd::error::Error> {
+    fn maybe_connect(&self) -> Result<mpdrs::Client<UnixStream>, mpdrs::error::Error> {
         let stream = UnixStream::connect(&self.config.sock_path)?;
-        mpd::Client::new(stream)
+        mpdrs::Client::new(stream)
     }
 
-    pub fn connect(&self) -> mpd::Client<UnixStream> {
+    pub fn connect(&self) -> mpdrs::Client<UnixStream> {
         self.maybe_connect().expect("Could not connect to daemon.")
     }
 }
